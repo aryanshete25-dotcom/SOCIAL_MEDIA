@@ -1,0 +1,955 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SocialAgent — AI Social Media Manager</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d2e;
+      --card: #212438;
+      --border: #2e3250;
+      --accent: #6c63ff;
+      --accent2: #ff6584;
+      --green: #43e97b;
+      --yellow: #f7c948;
+      --text: #e8eaf0;
+      --muted: #8b8fa8;
+      --radius: 14px;
+    }
+
+    body {
+      font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── NAV ── */
+    nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 28px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .logo { font-size: 1.25rem; font-weight: 700; color: var(--accent); letter-spacing: .5px; }
+    .logo span { color: var(--accent2); }
+    .nav-tabs { display: flex; gap: 6px; }
+    .nav-tab {
+      padding: 7px 18px;
+      border-radius: 30px;
+      border: none;
+      cursor: pointer;
+      font-size: .85rem;
+      font-weight: 600;
+      background: transparent;
+      color: var(--muted);
+      transition: background .2s, color .2s;
+    }
+    .nav-tab.active, .nav-tab:hover { background: var(--accent); color: #fff; }
+    .nav-right { display: flex; align-items: center; gap: 12px; }
+    .avatar {
+      width: 36px; height: 36px; border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 700; font-size: .9rem; color: #fff;
+    }
+
+    /* ── LAYOUT ── */
+    .app { display: flex; flex: 1; overflow: hidden; }
+
+    /* ── SIDEBAR ── */
+    aside {
+      width: 230px;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      padding: 20px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      overflow-y: auto;
+    }
+    .side-label { font-size: .7rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin: 14px 6px 4px; }
+    .side-btn {
+      display: flex; align-items: center; gap: 10px;
+      padding: 9px 12px; border-radius: 10px;
+      cursor: pointer; font-size: .88rem; font-weight: 500;
+      color: var(--muted); border: none; background: transparent;
+      transition: background .15s, color .15s; text-align: left; width: 100%;
+    }
+    .side-btn .icon { font-size: 1.1rem; width: 22px; text-align: center; }
+    .side-btn:hover, .side-btn.active { background: var(--card); color: var(--text); }
+    .side-btn.active { color: var(--accent); }
+    .badge {
+      margin-left: auto; background: var(--accent2); color: #fff;
+      font-size: .7rem; font-weight: 700; border-radius: 30px;
+      padding: 1px 7px;
+    }
+
+    /* ── MAIN CONTENT ── */
+    main { flex: 1; overflow-y: auto; padding: 28px; display: flex; flex-direction: column; gap: 24px; }
+
+    /* ── SECTION visibility ── */
+    .section { display: none; flex-direction: column; gap: 20px; }
+    .section.active { display: flex; }
+
+    /* ── CARDS ── */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+    }
+    .card-title { font-size: 1rem; font-weight: 700; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+    .card-title .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+
+    /* ── STATS ROW ── */
+    .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; }
+    .stat-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px 20px;
+    }
+    .stat-label { font-size: .78rem; color: var(--muted); margin-bottom: 6px; }
+    .stat-value { font-size: 1.8rem; font-weight: 800; }
+    .stat-delta { font-size: .78rem; color: var(--green); margin-top: 4px; }
+    .stat-delta.neg { color: var(--accent2); }
+
+    /* ── AI AGENT CHAT ── */
+    .chat-wrap { display: flex; flex-direction: column; height: 460px; }
+    .chat-messages {
+      flex: 1; overflow-y: auto; display: flex; flex-direction: column;
+      gap: 12px; padding: 4px 2px 10px;
+      scrollbar-width: thin; scrollbar-color: var(--border) transparent;
+    }
+    .msg { display: flex; gap: 10px; align-items: flex-start; max-width: 85%; }
+    .msg.user { flex-direction: row-reverse; align-self: flex-end; }
+    .msg-bubble {
+      padding: 10px 14px; border-radius: 14px;
+      font-size: .88rem; line-height: 1.55;
+    }
+    .msg.agent .msg-bubble { background: var(--surface); border: 1px solid var(--border); }
+    .msg.user  .msg-bubble { background: var(--accent); color: #fff; }
+    .msg-avatar {
+      width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: .8rem; font-weight: 700;
+    }
+    .msg.agent .msg-avatar { background: var(--accent); color: #fff; }
+    .msg.user  .msg-avatar { background: var(--accent2); color: #fff; }
+    .chat-input-row { display: flex; gap: 10px; margin-top: 12px; }
+    .chat-input {
+      flex: 1; padding: 10px 16px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 30px; color: var(--text); font-size: .88rem;
+      outline: none;
+    }
+    .chat-input:focus { border-color: var(--accent); }
+    .btn {
+      padding: 10px 22px; border-radius: 30px; border: none;
+      font-size: .88rem; font-weight: 700; cursor: pointer;
+      background: var(--accent); color: #fff;
+      transition: opacity .2s;
+    }
+    .btn:hover { opacity: .85; }
+    .btn-sm { padding: 6px 14px; font-size: .8rem; }
+    .btn-outline {
+      background: transparent; border: 1px solid var(--border);
+      color: var(--text);
+    }
+    .btn-outline:hover { border-color: var(--accent); color: var(--accent); background: transparent; }
+    .typing { display: flex; gap: 4px; align-items: center; padding: 10px 14px; }
+    .typing span { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); animation: blink 1.2s infinite; }
+    .typing span:nth-child(2) { animation-delay: .2s; }
+    .typing span:nth-child(3) { animation-delay: .4s; }
+    @keyframes blink { 0%,100%{opacity:.3} 50%{opacity:1} }
+
+    /* ── POST COMPOSER ── */
+    .platforms { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+    .platform-chip {
+      padding: 6px 14px; border-radius: 30px; font-size: .8rem; font-weight: 600;
+      border: 1px solid var(--border); cursor: pointer;
+      transition: all .15s; color: var(--muted); background: transparent;
+    }
+    .platform-chip.sel { border-color: var(--accent); color: var(--accent); background: rgba(108,99,255,.12); }
+    .platform-chip.tw.sel  { border-color: #1da1f2; color: #1da1f2; background: rgba(29,161,242,.1); }
+    .platform-chip.ig.sel  { border-color: #e1306c; color: #e1306c; background: rgba(225,48,108,.1); }
+    .platform-chip.li.sel  { border-color: #0a66c2; color: #0a66c2; background: rgba(10,102,194,.1); }
+    .platform-chip.fb.sel  { border-color: #1877f2; color: #1877f2; background: rgba(24,119,242,.1); }
+    .platform-chip.yt.sel  { border-color: #ff0000; color: #ff0000; background: rgba(255,0,0,.1); }
+    textarea.compose {
+      width: 100%; min-height: 110px; resize: vertical;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px; color: var(--text); font-size: .9rem;
+      padding: 12px 14px; outline: none; line-height: 1.6;
+    }
+    textarea.compose:focus { border-color: var(--accent); }
+    .char-count { text-align: right; font-size: .78rem; color: var(--muted); margin-top: 4px; }
+    .char-count.warn { color: var(--yellow); }
+    .char-count.over { color: var(--accent2); }
+    .compose-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; align-items: center; }
+    .schedule-input {
+      padding: 9px 12px; background: var(--surface);
+      border: 1px solid var(--border); border-radius: 10px;
+      color: var(--text); font-size: .84rem; outline: none;
+    }
+    .schedule-input:focus { border-color: var(--accent); }
+    .post-preview {
+      margin-top: 14px; padding: 14px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px; font-size: .87rem; line-height: 1.6;
+      white-space: pre-wrap; color: var(--text); display: none;
+    }
+
+    /* ── FEED ── */
+    .post-card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 18px 20px;
+    }
+    .post-header { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+    .post-avatar {
+      width: 40px; height: 40px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 700; font-size: .95rem;
+    }
+    .post-meta h4 { font-size: .9rem; font-weight: 700; }
+    .post-meta span { font-size: .78rem; color: var(--muted); }
+    .post-platform {
+      margin-left: auto; font-size: .75rem; font-weight: 700;
+      padding: 3px 10px; border-radius: 30px;
+    }
+    .post-body { font-size: .88rem; line-height: 1.6; margin-bottom: 12px; }
+    .post-actions { display: flex; gap: 16px; }
+    .post-action {
+      font-size: .82rem; color: var(--muted); cursor: pointer;
+      display: flex; align-items: center; gap: 5px;
+      background: none; border: none; transition: color .15s;
+    }
+    .post-action:hover { color: var(--accent); }
+    .post-action.liked { color: var(--accent2); }
+
+    /* ── ANALYTICS CHART ── */
+    .chart-wrap { height: 160px; display: flex; align-items: flex-end; gap: 8px; }
+    .bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+    .bar {
+      width: 100%; border-radius: 5px 5px 0 0;
+      background: var(--accent); transition: height .6s cubic-bezier(.4,0,.2,1);
+      min-height: 4px;
+    }
+    .bar-label { font-size: .72rem; color: var(--muted); }
+
+    /* ── CONTENT CALENDAR ── */
+    .calendar-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 8px;
+    }
+    .cal-head { text-align: center; font-size: .72rem; color: var(--muted); font-weight: 700; padding: 4px 0; }
+    .cal-day {
+      min-height: 64px; background: var(--surface);
+      border: 1px solid var(--border); border-radius: 8px;
+      padding: 6px; font-size: .75rem; cursor: pointer;
+      transition: border-color .15s;
+    }
+    .cal-day:hover { border-color: var(--accent); }
+    .cal-day.today { border-color: var(--accent); }
+    .cal-day.empty { background: transparent; border-color: transparent; cursor: default; }
+    .cal-day-num { font-size: .72rem; color: var(--muted); margin-bottom: 4px; }
+    .cal-event {
+      font-size: .65rem; padding: 2px 5px; border-radius: 4px;
+      margin-top: 2px; font-weight: 600; white-space: nowrap;
+      overflow: hidden; text-overflow: ellipsis;
+    }
+
+    /* ── HASHTAG / TRENDS ── */
+    .trend-row {
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px 0; border-bottom: 1px solid var(--border);
+    }
+    .trend-row:last-child { border-bottom: none; }
+    .trend-rank { width: 22px; font-size: .78rem; color: var(--muted); font-weight: 700; }
+    .trend-tag { font-weight: 700; font-size: .9rem; }
+    .trend-count { margin-left: auto; font-size: .78rem; color: var(--muted); }
+    .trend-bar-wrap { width: 80px; height: 6px; background: var(--border); border-radius: 3px; }
+    .trend-bar { height: 6px; border-radius: 3px; background: var(--accent); }
+
+    /* ── SCHEDULED QUEUE ── */
+    .queue-item {
+      display: flex; align-items: flex-start; gap: 14px;
+      padding: 14px 0; border-bottom: 1px solid var(--border);
+    }
+    .queue-item:last-child { border-bottom: none; }
+    .queue-time { min-width: 80px; font-size: .78rem; color: var(--muted); padding-top: 2px; }
+    .queue-body { flex: 1; }
+    .queue-body p { font-size: .87rem; line-height: 1.5; }
+    .queue-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+    .queue-tag { font-size: .72rem; padding: 2px 8px; border-radius: 20px; font-weight: 600; }
+    .queue-actions { display: flex; gap: 8px; align-items: center; }
+
+    /* ── TOAST ── */
+    .toast-wrap { position: fixed; bottom: 24px; right: 24px; display: flex; flex-direction: column; gap: 8px; z-index: 9999; }
+    .toast {
+      background: var(--card); border: 1px solid var(--border);
+      padding: 12px 18px; border-radius: 10px; font-size: .85rem;
+      max-width: 300px; animation: slideIn .3s ease;
+    }
+    .toast.success { border-left: 3px solid var(--green); }
+    .toast.error   { border-left: 3px solid var(--accent2); }
+    .toast.info    { border-left: 3px solid var(--accent); }
+    @keyframes slideIn { from{opacity:0;transform:translateX(40px)} to{opacity:1;transform:translateX(0)} }
+
+    /* ── RESPONSIVE ── */
+    @media(max-width:768px){
+      aside { display: none; }
+      .stats-row { grid-template-columns: 1fr 1fr; }
+      .calendar-grid { grid-template-columns: repeat(7,1fr); }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── NAV ── -->
+<nav>
+  <div class="logo">Social<span>Agent</span></div>
+  <div class="nav-tabs">
+    <button class="nav-tab active" onclick="switchSection('dashboard')">Dashboard</button>
+    <button class="nav-tab" onclick="switchSection('compose')">Compose</button>
+    <button class="nav-tab" onclick="switchSection('feed')">Feed</button>
+    <button class="nav-tab" onclick="switchSection('agent')">AI Agent</button>
+    <button class="nav-tab" onclick="switchSection('analytics')">Analytics</button>
+  </div>
+  <div class="nav-right">
+    <div class="avatar">VA</div>
+  </div>
+</nav>
+
+<div class="app">
+
+  <!-- ── SIDEBAR ── -->
+  <aside>
+    <div class="side-label">Manage</div>
+    <button class="side-btn active" onclick="switchSection('dashboard')"><span class="icon">🏠</span>Dashboard</button>
+    <button class="side-btn" onclick="switchSection('compose')"><span class="icon">✏️</span>Compose</button>
+    <button class="side-btn" onclick="switchSection('feed')"><span class="icon">📰</span>Feed</button>
+    <button class="side-btn" onclick="switchSection('queue')"><span class="icon">🗓️</span>Scheduled<span class="badge">4</span></button>
+    <button class="side-btn" onclick="switchSection('calendar')"><span class="icon">📅</span>Calendar</button>
+
+    <div class="side-label">Insights</div>
+    <button class="side-btn" onclick="switchSection('analytics')"><span class="icon">📊</span>Analytics</button>
+    <button class="side-btn" onclick="switchSection('trends')"><span class="icon">🔥</span>Trends</button>
+
+    <div class="side-label">AI Tools</div>
+    <button class="side-btn" onclick="switchSection('agent')"><span class="icon">🤖</span>AI Agent</button>
+  </aside>
+
+  <!-- ── MAIN ── -->
+  <main>
+
+    <!-- ══ DASHBOARD ══ -->
+    <div id="section-dashboard" class="section active">
+      <h2 style="font-size:1.3rem;font-weight:800;">Good morning, ARYAN 👋</h2>
+
+      <div class="stats-row">
+        <div class="stat-card">
+          <div class="stat-label">Total Followers</div>
+          <div class="stat-value" id="stat-followers">48.2K</div>
+          <div class="stat-delta">▲ +3.4% this week</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Posts This Month</div>
+          <div class="stat-value" id="stat-posts">64</div>
+          <div class="stat-delta">▲ +12 vs last month</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Avg Engagement</div>
+          <div class="stat-value">6.8%</div>
+          <div class="stat-delta">▲ +0.9%</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Reach (7d)</div>
+          <div class="stat-value">182K</div>
+          <div class="stat-delta neg">▼ -2.1%</div>
+        </div>
+      </div>
+
+      <!-- Quick-compose card -->
+      <div class="card">
+        <div class="card-title"><span class="dot"></span>Quick Post</div>
+        <div class="platforms" id="dash-platforms">
+          <button class="platform-chip tw" onclick="toggleChip(this)">🐦 Twitter</button>
+          <button class="platform-chip ig" onclick="toggleChip(this)">📸 Instagram</button>
+          <button class="platform-chip li" onclick="toggleChip(this)">💼 LinkedIn</button>
+          <button class="platform-chip fb" onclick="toggleChip(this)">📘 Facebook</button>
+        </div>
+        <textarea class="compose" id="dash-compose" placeholder="What's on your mind? Ask AI to write it for you →" oninput="updateCharCount(this,'dash-char')"></textarea>
+        <div class="char-count" id="dash-char">0 / 280</div>
+        <div class="compose-actions">
+          <button class="btn btn-outline btn-sm" onclick="aiWritePost('dash-compose')">✨ AI Write</button>
+          <button class="btn btn-sm" onclick="publishPost('dash-compose')">Post Now</button>
+        </div>
+      </div>
+
+      <!-- Platform breakdown -->
+      <div class="card">
+        <div class="card-title"><span class="dot"></span>Platform Breakdown</div>
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          <div id="breakdown-rows"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ COMPOSE ══ -->
+    <div id="section-compose" class="section">
+      <h2 style="font-size:1.3rem;font-weight:800;">Compose Post</h2>
+      <div class="card">
+        <div class="card-title"><span class="dot"></span>Select Platforms</div>
+        <div class="platforms" id="comp-platforms">
+          <button class="platform-chip tw sel" onclick="toggleChip(this)">🐦 Twitter</button>
+          <button class="platform-chip ig" onclick="toggleChip(this)">📸 Instagram</button>
+          <button class="platform-chip li" onclick="toggleChip(this)">💼 LinkedIn</button>
+          <button class="platform-chip fb" onclick="toggleChip(this)">📘 Facebook</button>
+          <button class="platform-chip yt" onclick="toggleChip(this)">▶️ YouTube</button>
+        </div>
+        <textarea class="compose" id="comp-compose" placeholder="Write your post..." oninput="updateCharCount(this,'comp-char')"></textarea>
+        <div class="char-count" id="comp-char">0 / 280</div>
+        <div class="compose-actions">
+          <button class="btn btn-outline btn-sm" onclick="aiWritePost('comp-compose')">✨ AI Write</button>
+          <button class="btn btn-outline btn-sm" onclick="aiHashtags('comp-compose')">🏷️ Hashtags</button>
+          <button class="btn btn-outline btn-sm" onclick="aiImprove('comp-compose')">🔁 Improve</button>
+          <input type="datetime-local" class="schedule-input" id="schedule-time"/>
+          <button class="btn btn-sm" style="background:var(--yellow);color:#111;" onclick="schedulePost()">📅 Schedule</button>
+          <button class="btn btn-sm" onclick="publishPost('comp-compose')">Post Now</button>
+        </div>
+        <div class="post-preview" id="post-preview"></div>
+      </div>
+    </div>
+
+    <!-- ══ FEED ══ -->
+    <div id="section-feed" class="section">
+      <h2 style="font-size:1.3rem;font-weight:800;">Your Feed</h2>
+      <div id="feed-container"></div>
+    </div>
+
+    <!-- ══ AI AGENT ══ -->
+    <div id="section-agent" class="section">
+      <h2 style="font-size:1.3rem;font-weight:800;">🤖 AI Social Media Agent</h2>
+      <div class="card" style="flex:1;">
+        <div class="card-title"><span class="dot"></span>Chat with your AI Agent</div>
+        <div class="chat-wrap">
+          <div class="chat-messages" id="chat-messages"></div>
+          <div class="chat-input-row">
+            <input class="chat-input" id="chat-input" placeholder="Ask the agent anything — write a post, analyse trends, schedule content…" onkeydown="if(event.key==='Enter')sendChat()"/>
+            <button class="btn" onclick="sendChat()">Send</button>
+          </div>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;">
+          <button class="btn btn-outline btn-sm" onclick="quickPrompt('Write a viral tweet about productivity')">💡 Viral Tweet</button>
+          <button class="btn btn-outline btn-sm" onclick="quickPrompt('Suggest 5 content ideas for Instagram this week')">📸 Content Ideas</button>
+          <button class="btn btn-outline btn-sm" onclick="quickPrompt('Analyse my engagement and give tips to improve')">📊 Analyse</button>
+          <button class="btn btn-outline btn-sm" onclick="quickPrompt('Create a LinkedIn post about AI trends in 2025')">💼 LinkedIn Post</button>
+          <button class="btn btn-outline btn-sm" onclick="quickPrompt('Write 10 trending hashtags for technology')">🏷️ Hashtags</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ ANALYTICS ══ -->
+    <div id="section-analytics" class="section">
+      <h2 style="font-size:1.3rem;font-weight:800;">Analytics</h2>
+      <div class="stats-row">
+        <div class="stat-card"><div class="stat-label">Impressions</div><div class="stat-value">1.2M</div><div class="stat-delta">▲ +8.3%</div></div>
+        <div class="stat-card"><div class="stat-label">Link Clicks</div><div class="stat-value">9,400</div><div class="stat-delta">▲ +5.1%</div></div>
+        <div class="stat-card"><div class="stat-label">Shares</div><div class="stat-value">3,812</div><div class="stat-delta">▲ +14%</div></div>
+        <div class="stat-card"><div class="stat-label">Comments</div><div class="stat-value">2,130</div><div class="stat-delta neg">▼ -1.2%</div></div>
+      </div>
+      <div class="card">
+        <div class="card-title"><span class="dot"></span>Weekly Engagement (Posts / day)</div>
+        <div class="chart-wrap" id="engagement-chart"></div>
+      </div>
+      <div class="card">
+        <div class="card-title"><span class="dot"></span>Follower Growth (Last 6 months)</div>
+        <div class="chart-wrap" id="growth-chart"></div>
+      </div>
+    </div>
+
+    <!-- ══ TRENDS ══ -->
+    <div id="section-trends" class="section">
+      <h2 style="font-size:1.3rem;font-weight:800;">Trending Hashtags</h2>
+      <div class="card">
+        <div class="card-title"><span class="dot"></span>Top Trends Right Now</div>
+        <div id="trends-list"></div>
+      </div>
+    </div>
+
+    <!-- ══ CALENDAR ══ -->
+    <div id="section-calendar" class="section">
+      <h2 style="font-size:1.3rem;font-weight:800;">Content Calendar — July 2025</h2>
+      <div class="card">
+        <div class="calendar-grid" id="calendar-grid"></div>
+      </div>
+    </div>
+
+    <!-- ══ QUEUE ══ -->
+    <div id="section-queue" class="section">
+      <h2 style="font-size:1.3rem;font-weight:800;">Scheduled Posts</h2>
+      <div class="card">
+        <div id="queue-list"></div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- ── TOAST CONTAINER ── -->
+<div class="toast-wrap" id="toast-wrap"></div>
+
+<script>
+/* ══════════════════════════════════════════════
+   DATA
+══════════════════════════════════════════════ */
+const feedPosts = [
+  { id:1, user:"aryan", handle:"@aryan", avatar:"AR", avatarColor:"#6c63ff", platform:"Twitter", platformColor:"#1da1f2", body:"🚀 Just launched my new AI-powered social media dashboard. The future of content creation is here! #AI #SocialMedia #ProductLaunch", likes:312, comments:48, shares:92, liked:false, time:"2h ago" },
+  { id:2, user:"aryan", handle:"@aryan", avatar:"AR", avatarColor:"#6c63ff", platform:"Instagram", platformColor:"#e1306c", body:"Golden hour hits different when you're coding something you love. 🌅 Drop a ❤️ if you're a night-owl developer! #DevLife #GoldenHour #CodeWithPassion", likes:1204, comments:87, shares:34, liked:false, time:"5h ago" },
+  { id:3, user:"aryan", handle:"@aryan", avatar:"AR", avatarColor:"#6c63ff", platform:"LinkedIn", platformColor:"#0a66c2", body:"Excited to share that I've been exploring how AI can completely transform social media management. Here are 3 key insights from the past month:\n\n1️⃣ AI writes better first drafts than most humans\n2️⃣ Predictive scheduling doubles engagement\n3️⃣ Automated hashtag research saves hours weekly\n\n#AI #LinkedInLearning #FutureOfWork", likes:489, comments:62, shares:115, liked:false, time:"1d ago" },
+  { id:4, user:"aryan", handle:"@aryan", avatar:"AR", avatarColor:"#6c63ff", platform:"Twitter", platformColor:"#1da1f2", body:"Hot take: The best productivity tool is a good night's sleep. No app, no hack, no supplement beats 8 hours. Agree or disagree? 🧵", likes:780, comments:134, shares:201, liked:false, time:"2d ago" },
+];
+
+const scheduledPosts = [
+  { id:1, time:"Today, 3:00 PM", text:"🌟 Exciting things are coming — stay tuned! #ComingSoon", platforms:["Twitter","Instagram"], status:"scheduled" },
+  { id:2, time:"Today, 7:00 PM", text:"✨ 5 productivity hacks that actually work in 2025. Thread below 🧵 #Productivity #Tips", platforms:["Twitter"], status:"scheduled" },
+  { id:3, time:"Tomorrow, 9:00 AM", text:"Good morning! Here's your weekly dose of AI news and insights. What topic should I cover next? 👇 #AI #Newsletter", platforms:["LinkedIn","Facebook"], status:"scheduled" },
+  { id:4, time:"Tomorrow, 12:00 PM", text:"📊 Weekly analytics drop: My best-performing content this week and what you can learn from it. Link in bio!", platforms:["Instagram"], status:"scheduled" },
+];
+
+const trends = [
+  { tag:"#ArtificialIntelligence", count:"2.4M posts", pct:92 },
+  { tag:"#ChatGPT", count:"1.8M posts", pct:80 },
+  { tag:"#WebDevelopment", count:"1.2M posts", pct:68 },
+  { tag:"#Productivity", count:"980K posts", pct:58 },
+  { tag:"#StartupLife", count:"870K posts", pct:51 },
+  { tag:"#DevLife", count:"760K posts", pct:44 },
+  { tag:"#ContentCreator", count:"640K posts", pct:38 },
+  { tag:"#TechTrends", count:"520K posts", pct:30 },
+  { tag:"#SocialMedia", count:"490K posts", pct:27 },
+  { tag:"#OpenSource", count:"410K posts", pct:22 },
+];
+
+const weekDays = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+const engagementData = [
+  {day:"Mon", val:62}, {day:"Tue", val:88}, {day:"Wed", val:74},
+  {day:"Thu", val:95}, {day:"Fri", val:110}, {day:"Sat", val:58}, {day:"Sun", val:45}
+];
+const growthData = [
+  {day:"Feb", val:30}, {day:"Mar", val:48}, {day:"Apr", val:60},
+  {day:"May", val:72}, {day:"Jun", val:85}, {day:"Jul", val:100}
+];
+
+const platformBreakdown = [
+  { name:"Twitter",   color:"#1da1f2", pct:38 },
+  { name:"Instagram", color:"#e1306c", pct:29 },
+  { name:"LinkedIn",  color:"#0a66c2", pct:21 },
+  { name:"Facebook",  color:"#1877f2", pct:12 },
+];
+
+/* ══════════════════════════════════════════════
+   AI AGENT RESPONSES
+══════════════════════════════════════════════ */
+const agentKB = [
+  { keys:["viral","tweet","twitter"], response:"Here's a viral-style tweet for you:\n\n🔥 \"Nobody talks about how lonely success can feel. You hit every goal, but forgot to enjoy the journey. Slow down. Build memories, not just milestones.\"\n\nUse this hook to spark engagement — controversial takes + emotional truth = shares. Add #MindsetShift #GrowthMindset for reach." },
+  { keys:["content","idea","instagram","week"], response:"Here are 5 Instagram content ideas for this week:\n\n1. 📸 Behind-the-scenes of your workspace/setup\n2. 🎯 'Day in my life' Reel (high reach right now)\n3. 💡 Carousel: '5 tools I use daily'\n4. 🔔 Poll story: Ask your audience a burning question\n5. 🌟 Testimonial or win highlight — show social proof\n\nPost Reels between 6–9 PM for peak engagement." },
+  { keys:["analyse","engagement","tip","improve"], response:"📊 Based on your profile data:\n\n✅ Strengths:\n• Twitter engagement rate (6.8%) is above industry avg (3.2%)\n• LinkedIn impressions grew 14% this month\n\n⚠️ Opportunities:\n• Instagram reach dropped — try more Reels vs static posts\n• Post consistency: aim for 1 post/day instead of 2 on weekends\n• Use CTAs in every post: ask a question or invite comments\n\n💡 Top tip: Repurpose your best LinkedIn posts as Twitter threads — it takes 10 min and doubles your output." },
+  { keys:["linkedin","post","ai","trend","2025"], response:"Here's a LinkedIn post about AI trends in 2025:\n\n---\n🤖 5 AI trends that will redefine how we work in 2025:\n\n1. Agentic AI — systems that act autonomously on your behalf\n2. Multimodal models — text, image, audio, video in one prompt\n3. AI-native software — apps built around AI, not just plugged in\n4. Personal AI assistants that know your preferences deeply\n5. AI governance & ethics becoming a C-suite priority\n\nThe companies that adapt now will lead the next decade. Which trend are you most excited about? 👇\n\n#AI #FutureOfWork #AITrends #Innovation #Leadership\n---\nThis post uses a numbered list (high LinkedIn engagement), ends with a question (boosts comments), and uses strategic hashtags." },
+  { keys:["hashtag","technology","tech","trending"], response:"Here are 10 trending hashtags for technology:\n\n1. #ArtificialIntelligence\n2. #MachineLearning\n3. #WebDevelopment\n4. #TechTrends2025\n5. #CloudComputing\n6. #CyberSecurity\n7. #OpenSource\n8. #DevOps\n9. #FutureOfTech\n10. #SoftwareEngineering\n\n💡 Pro tip: Mix high-volume (#AI — 2M+) with niche (#DevOps — 400K) hashtags. Use 3–5 on Twitter, up to 10 on Instagram for best reach." },
+  { keys:["schedule","best","time","post"], response:"📅 Best posting times by platform (2025):\n\n🐦 Twitter: Mon–Fri, 8–10 AM & 7–9 PM\n📸 Instagram: Tue–Fri, 6–9 PM (Reels anytime)\n💼 LinkedIn: Tue–Thu, 7–9 AM & 12 PM\n📘 Facebook: Wed–Fri, 1–4 PM\n▶️ YouTube: Fri–Sun, 2–4 PM\n\nYour audience is most active on weekday evenings based on your analytics. I'd recommend scheduling your top posts for Tuesday and Thursday at 7 PM." },
+  { keys:["bio","profile","optimize","optimise"], response:"Here's an optimised bio formula for different platforms:\n\n🐦 Twitter (160 chars): Role + Passion + CTA\nExample: 'AI & Tech creator 🤖 | Sharing weekly insights on the future of work | 👇 Free AI toolkit link'\n\n📸 Instagram (150 chars): Who you help + How + CTA with emoji\nExample: '✨ Helping creators grow smarter with AI\n📊 Social Media tips daily\n🔗 Free Content Calendar ↓'\n\n💼 LinkedIn (220 chars): Expertise + Impact + Keywords\nFocus on what you do for others, not just your title. Use keywords recruiters and followers search for." },
+];
+
+function getAgentResponse(input) {
+  const lower = input.toLowerCase();
+  for (const item of agentKB) {
+    if (item.keys.some(k => lower.includes(k))) return item.response;
+  }
+  // Generic fallback responses
+  const fallbacks = [
+    `Great question! As your AI social media agent, here's what I'd recommend:\n\nFor "${input.slice(0,40)}...", start by defining your target audience clearly. Understanding who you're speaking to determines everything — tone, platform, timing, and content type.\n\n💡 Want me to dive deeper into any specific aspect? Try asking about hashtags, content ideas, posting times, or ask me to write a specific post!`,
+    `I'm on it! 🤖\n\nFor: "${input.slice(0,50)}"\n\nHere's my action plan:\n1. Research your audience's pain points around this topic\n2. Craft a hook that stops the scroll\n3. Deliver value in 3 punchy points\n4. End with a strong CTA\n\nWant me to write the full post? Just say "write a post about [topic]" and I'll generate it instantly!`,
+    `Analysing your request... 🧠\n\nBased on current social media trends, here's my take:\n• Short-form video (Reels/TikTok) drives 3x more reach than static posts\n• Authenticity outperforms polished content in 2025\n• Consistency beats virality — 5 good posts/week wins long-term\n\nLet me know if you want a specific post written, hashtag strategy, or engagement tips!`,
+  ];
+  return fallbacks[Math.floor(Math.random() * fallbacks.length)];
+}
+
+/* ══════════════════════════════════════════════
+   AI WRITE / IMPROVE / HASHTAGS
+══════════════════════════════════════════════ */
+const aiPosts = [
+  "🚀 The future belongs to those who build it. Every line of code, every idea shared, every connection made — it all adds up. Keep going. 💪 #BuildInPublic #Tech #Motivation",
+  "✨ Unpopular opinion: Rest is a productivity strategy. You can't pour from an empty cup. Take the break. You'll come back sharper. 🧠 #Mindset #Productivity #WorkLifeBalance",
+  "🌟 3 things I wish I knew before growing my social media:\n1. Consistency > perfection\n2. Engagement > follower count\n3. Authenticity > aesthetics\n\nSave this. You'll thank yourself later. 📌 #GrowthTips #CreatorEconomy",
+  "💡 AI won't replace you. A person using AI will. Get ahead of the curve — start experimenting today. The tools are free, the knowledge is everywhere, and the window is now. #AI #FutureOfWork #Innovation",
+  "📊 Data doesn't lie: creators who post 5+ days/week grow 4x faster than those who post 2x/week. The algorithm rewards consistency. Simple math. 🗓️ #ContentStrategy #GrowthHacking",
+];
+const hashtags = ["#AI", "#TechTrends", "#SocialMedia", "#ContentCreator", "#GrowthHacking", "#BuildInPublic", "#Innovation", "#DigitalMarketing", "#Productivity", "#FutureOfWork"];
+
+function aiWritePost(id) {
+  const el = document.getElementById(id);
+  const post = aiPosts[Math.floor(Math.random() * aiPosts.length)];
+  el.value = post;
+  updateCharCount(el, id === 'dash-compose' ? 'dash-char' : 'comp-char');
+  showToast("✨ AI generated your post!", "success");
+  if (id === 'comp-compose') showPreview(post);
+}
+
+function aiHashtags(id) {
+  const el = document.getElementById(id);
+  const shuffled = hashtags.sort(()=>Math.random()-.5).slice(0,6).join(" ");
+  el.value = (el.value + "\n\n" + shuffled).trim();
+  updateCharCount(el, 'comp-char');
+  showToast("🏷️ Hashtags added!", "info");
+}
+
+function aiImprove(id) {
+  const el = document.getElementById(id);
+  if (!el.value.trim()) { showToast("Write something first!", "error"); return; }
+  const prefix = ["🔥 ", "💡 ", "🚀 ", "✨ ", "🌟 "][Math.floor(Math.random()*5)];
+  const suffix = ["\n\nWhat do you think? 💬", "\n\nSave this for later! 📌", "\n\nTag someone who needs to see this! 👇", "\n\nLet me know your thoughts below ⬇️"][Math.floor(Math.random()*4)];
+  el.value = prefix + el.value + suffix;
+  updateCharCount(el, 'comp-char');
+  showToast("🔁 Post improved!", "success");
+  showPreview(el.value);
+}
+
+function showPreview(text) {
+  const p = document.getElementById('post-preview');
+  p.style.display = 'block';
+  p.textContent = text;
+}
+
+/* ══════════════════════════════════════════════
+   CHAR COUNT
+══════════════════════════════════════════════ */
+function updateCharCount(el, countId) {
+  const max = 280, len = el.value.length;
+  const c = document.getElementById(countId);
+  c.textContent = `${len} / ${max}`;
+  c.className = 'char-count' + (len > max ? ' over' : len > 240 ? ' warn' : '');
+}
+
+/* ══════════════════════════════════════════════
+   PUBLISH / SCHEDULE
+══════════════════════════════════════════════ */
+function publishPost(id) {
+  const el = document.getElementById(id);
+  if (!el.value.trim()) { showToast("Please write a post first!", "error"); return; }
+  showToast("🚀 Post published successfully!", "success");
+  el.value = "";
+  updateCharCount(el, id === 'dash-compose' ? 'dash-char' : 'comp-char');
+  document.getElementById('post-preview').style.display = 'none';
+}
+
+function schedulePost() {
+  const text = document.getElementById('comp-compose').value.trim();
+  const time = document.getElementById('schedule-time').value;
+  if (!text) { showToast("Write a post first!", "error"); return; }
+  if (!time) { showToast("Pick a date & time!", "error"); return; }
+  const dt = new Date(time);
+  const label = dt.toLocaleDateString('en-US',{month:'short',day:'numeric'}) + " " + dt.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
+  scheduledPosts.unshift({ id: Date.now(), time: label, text, platforms: ["Twitter"], status:"scheduled" });
+  renderQueue();
+  showToast(`📅 Scheduled for ${label}`, "success");
+  document.getElementById('comp-compose').value = "";
+}
+
+/* ══════════════════════════════════════════════
+   PLATFORM CHIPS
+══════════════════════════════════════════════ */
+function toggleChip(el) {
+  el.classList.toggle('sel');
+}
+
+/* ══════════════════════════════════════════════
+   FEED
+══════════════════════════════════════════════ */
+function renderFeed() {
+  const c = document.getElementById('feed-container');
+  c.innerHTML = "";
+  feedPosts.forEach(post => {
+    c.innerHTML += `
+    <div class="post-card" style="margin-bottom:16px;" id="post-${post.id}">
+      <div class="post-header">
+        <div class="post-avatar" style="background:${post.avatarColor};color:#fff;">${post.avatar}</div>
+        <div class="post-meta">
+          <h4>${post.user}</h4>
+          <span>${post.handle} · ${post.time}</span>
+        </div>
+        <span class="post-platform" style="background:${post.platformColor}22;color:${post.platformColor};">${post.platform}</span>
+      </div>
+      <div class="post-body">${post.body}</div>
+      <div class="post-actions">
+        <button class="post-action ${post.liked?'liked':''}" id="like-${post.id}" onclick="toggleLike(${post.id})">❤️ <span id="like-count-${post.id}">${post.likes}</span></button>
+        <button class="post-action">💬 ${post.comments}</button>
+        <button class="post-action" onclick="showToast('Copied link!','info')">🔗 ${post.shares}</button>
+        <button class="post-action" onclick="showToast('Post shared!','success')">↗️ Share</button>
+      </div>
+    </div>`;
+  });
+}
+
+function toggleLike(id) {
+  const post = feedPosts.find(p => p.id === id);
+  post.liked = !post.liked;
+  post.likes += post.liked ? 1 : -1;
+  document.getElementById(`like-count-${id}`).textContent = post.likes;
+  document.getElementById(`like-${id}`).classList.toggle('liked', post.liked);
+}
+
+/* ══════════════════════════════════════════════
+   PLATFORM BREAKDOWN
+══════════════════════════════════════════════ */
+function renderBreakdown() {
+  const el = document.getElementById('breakdown-rows');
+  el.innerHTML = platformBreakdown.map(p => `
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">
+      <span style="min-width:80px;font-size:.84rem;color:var(--muted);">${p.name}</span>
+      <div style="flex:1;height:8px;background:var(--border);border-radius:4px;">
+        <div style="width:${p.pct}%;height:100%;border-radius:4px;background:${p.color};"></div>
+      </div>
+      <span style="min-width:34px;font-size:.82rem;font-weight:700;color:${p.color};">${p.pct}%</span>
+    </div>`).join('');
+}
+
+/* ══════════════════════════════════════════════
+   CHARTS
+══════════════════════════════════════════════ */
+function renderChart(containerId, data, color) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  const max = Math.max(...data.map(d=>d.val));
+  el.innerHTML = data.map(d => `
+    <div class="bar-col">
+      <div class="bar" style="height:${Math.round((d.val/max)*140)}px;background:${color||'var(--accent)'};" title="${d.val}"></div>
+      <div class="bar-label">${d.day}</div>
+    </div>`).join('');
+}
+
+/* ══════════════════════════════════════════════
+   TRENDS
+══════════════════════════════════════════════ */
+function renderTrends() {
+  const el = document.getElementById('trends-list');
+  el.innerHTML = trends.map((t,i) => `
+    <div class="trend-row">
+      <span class="trend-rank">${i+1}</span>
+      <span class="trend-tag">${t.tag}</span>
+      <div class="trend-bar-wrap"><div class="trend-bar" style="width:${t.pct}%;"></div></div>
+      <span class="trend-count">${t.count}</span>
+      <button class="btn btn-outline btn-sm" style="margin-left:8px;" onclick="addTrendToCompose('${t.tag}')">+ Add</button>
+    </div>`).join('');
+}
+
+function addTrendToCompose(tag) {
+  const el = document.getElementById('comp-compose');
+  el.value = (el.value + ' ' + tag).trim();
+  updateCharCount(el, 'comp-char');
+  switchSection('compose');
+  showToast(`${tag} added to compose!`, "info");
+}
+
+/* ══════════════════════════════════════════════
+   CALENDAR
+══════════════════════════════════════════════ */
+const calEvents = {
+  3: [{text:"IG Reel", color:"#e1306c"}],
+  7: [{text:"Twitter thread", color:"#1da1f2"}],
+  10: [{text:"LinkedIn post", color:"#0a66c2"}],
+  14: [{text:"Campaign launch", color:"#6c63ff"},{text:"FB post", color:"#1877f2"}],
+  17: [{text:"Newsletter", color:"#f7c948"}],
+  21: [{text:"Product update", color:"#43e97b"}],
+  24: [{text:"Engagement day", color:"#6c63ff"}],
+  28: [{text:"Monthly wrap", color:"#ff6584"}],
+};
+
+function renderCalendar() {
+  const el = document.getElementById('calendar-grid');
+  const today = 9; // simulated today = July 9
+  let html = weekDays.map(d => `<div class="cal-head">${d}</div>`).join('');
+  const firstDay = 2; // July 2025 starts Tuesday
+  for (let i = 0; i < firstDay; i++) html += `<div class="cal-day empty"></div>`;
+  for (let d = 1; d <= 31; d++) {
+    const evts = calEvents[d] || [];
+    const todayCls = d === today ? ' today' : '';
+    html += `<div class="cal-day${todayCls}">
+      <div class="cal-day-num">${d}</div>
+      ${evts.map(e=>`<div class="cal-event" style="background:${e.color}22;color:${e.color};">${e.text}</div>`).join('')}
+    </div>`;
+  }
+  el.innerHTML = html;
+}
+
+/* ══════════════════════════════════════════════
+   QUEUE
+══════════════════════════════════════════════ */
+function renderQueue() {
+  const el = document.getElementById('queue-list');
+  el.innerHTML = scheduledPosts.map(p => `
+    <div class="queue-item" id="qi-${p.id}">
+      <div class="queue-time">${p.time}</div>
+      <div class="queue-body">
+        <p>${p.text}</p>
+        <div class="queue-tags">
+          ${p.platforms.map(pl=>`<span class="queue-tag" style="background:${getPlatformColor(pl)}22;color:${getPlatformColor(pl)};">${pl}</span>`).join('')}
+        </div>
+      </div>
+      <div class="queue-actions">
+        <button class="btn btn-outline btn-sm" onclick="editQueued(${p.id})">✏️</button>
+        <button class="btn btn-sm" style="background:var(--accent2);" onclick="deleteQueued(${p.id})">✕</button>
+      </div>
+    </div>`).join('');
+}
+
+function getPlatformColor(name) {
+  const map = { Twitter:"#1da1f2", Instagram:"#e1306c", LinkedIn:"#0a66c2", Facebook:"#1877f2", YouTube:"#ff0000" };
+  return map[name] || "#6c63ff";
+}
+
+function editQueued(id) {
+  const post = scheduledPosts.find(p=>p.id===id);
+  document.getElementById('comp-compose').value = post.text;
+  switchSection('compose');
+  showToast("Post loaded into composer!", "info");
+}
+
+function deleteQueued(id) {
+  const idx = scheduledPosts.findIndex(p=>p.id===id);
+  if (idx > -1) scheduledPosts.splice(idx,1);
+  renderQueue();
+  showToast("Post removed from queue.", "info");
+}
+
+/* ══════════════════════════════════════════════
+   AI CHAT
+══════════════════════════════════════════════ */
+function appendMsg(role, text) {
+  const c = document.getElementById('chat-messages');
+  const div = document.createElement('div');
+  div.className = `msg ${role}`;
+  div.innerHTML = `
+    <div class="msg-avatar">${role==='agent'?'🤖':'VA'}</div>
+    <div class="msg-bubble">${text.replace(/\n/g,'<br>')}</div>`;
+  c.appendChild(div);
+  c.scrollTop = c.scrollHeight;
+}
+
+function showTyping() {
+  const c = document.getElementById('chat-messages');
+  const div = document.createElement('div');
+  div.className = 'msg agent';
+  div.id = 'typing-indicator';
+  div.innerHTML = `<div class="msg-avatar">🤖</div><div class="msg-bubble"><div class="typing"><span></span><span></span><span></span></div></div>`;
+  c.appendChild(div);
+  c.scrollTop = c.scrollHeight;
+}
+
+function removeTyping() {
+  const t = document.getElementById('typing-indicator');
+  if (t) t.remove();
+}
+
+function sendChat() {
+  const inp = document.getElementById('chat-input');
+  const text = inp.value.trim();
+  if (!text) return;
+  appendMsg('user', text);
+  inp.value = "";
+  showTyping();
+  setTimeout(() => {
+    removeTyping();
+    appendMsg('agent', getAgentResponse(text));
+  }, 900 + Math.random() * 700);
+}
+
+function quickPrompt(prompt) {
+  document.getElementById('chat-input').value = prompt;
+  sendChat();
+}
+
+/* ══════════════════════════════════════════════
+   SECTION SWITCHING
+══════════════════════════════════════════════ */
+function switchSection(name) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.side-btn').forEach(b => b.classList.remove('active'));
+
+  const sec = document.getElementById(`section-${name}`);
+  if (sec) sec.classList.add('active');
+
+  document.querySelectorAll('.nav-tab').forEach(t => {
+    if (t.getAttribute('onclick') && t.getAttribute('onclick').includes(name)) t.classList.add('active');
+  });
+  document.querySelectorAll('.side-btn').forEach(b => {
+    if (b.getAttribute('onclick') && b.getAttribute('onclick').includes(name)) b.classList.add('active');
+  });
+}
+
+/* ══════════════════════════════════════════════
+   TOAST
+══════════════════════════════════════════════ */
+function showToast(msg, type = "info") {
+  const wrap = document.getElementById('toast-wrap');
+  const t = document.createElement('div');
+  t.className = `toast ${type}`;
+  t.textContent = msg;
+  wrap.appendChild(t);
+  setTimeout(() => t.remove(), 3200);
+}
+
+/* ══════════════════════════════════════════════
+   INIT
+══════════════════════════════════════════════ */
+(function init() {
+  renderFeed();
+  renderBreakdown();
+  renderChart('engagement-chart', engagementData, 'var(--accent)');
+  renderChart('growth-chart', growthData, 'var(--green)');
+  renderTrends();
+  renderCalendar();
+  renderQueue();
+
+  // Initial agent greeting
+  setTimeout(() => {
+    appendMsg('agent', "👋 Hi there! I'm your AI Social Media Agent.\n\nI can help you:\n• ✏️ Write & improve posts for any platform\n• 📅 Plan and schedule your content calendar\n• 📊 Analyse your engagement and suggest improvements\n• 🏷️ Find trending hashtags and content ideas\n• 🚀 Grow your audience with data-driven strategies\n\nWhat would you like to do today?");
+  }, 300);
+})();
+</script>
+<script>
+  window.wxOConfiguration = {
+    orchestrationID: "9e397e1fa64b4905ba7ef791a119e0cf_6c391613-f641-4b21-8a37-ab7db111e750",
+    hostURL: "https://au-syd.watson-orchestrate.cloud.ibm.com",
+    rootElementID: "root",
+    deploymentPlatform: "ibmcloud",
+    crn: "crn:v1:bluemix:public:watsonx-orchestrate:au-syd:a/9e397e1fa64b4905ba7ef791a119e0cf:6c391613-f641-4b21-8a37-ab7db111e750::",
+    chatOptions: {
+        agentId: "6c4b8f8d-a5ad-4305-9531-e42da6c290c6", 
+    }
+  };
+  setTimeout(function () {
+    const script = document.createElement('script');
+    script.src = `${window.wxOConfiguration.hostURL}/wxochat/wxoLoader.js?embed=true`;
+    script.addEventListener('load', function () {
+        wxoLoader.init();
+    });
+    document.head.appendChild(script);
+  }, 0);                     
+</script>
+</body>
+</html>
